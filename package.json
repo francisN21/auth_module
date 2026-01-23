@@ -1,0 +1,24 @@
+{
+  "name": "auth_module",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "pino": "^10.2.1",
+    "pino-http": "^11.0.0",
+    "zod": "^4.3.6"
+  }
+}
