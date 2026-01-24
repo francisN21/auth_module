@@ -9,6 +9,8 @@ const cookieParser = require("cookie-parser");
 const authRouter = require("../routes/auth");
 const { notFound } = require("../middleware/notFound");
 const { errorHandler } = require("../middleware/errorHandler");
+const { pool } = require("./db");
+
 
 const app = express();
 
@@ -35,9 +37,19 @@ app.use(
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, service: "auth_module" });
 });
+app.get("/health/db", async (req, res, next) => {
+  try {
+    const r = await pool.query("SELECT 1 AS ok");
+    res.json({ ok: true, db: r.rows[0].ok });
+  } catch (e) {
+    next(e);
+  }
+});
+
 
 // Routes
 app.use("/auth", authRouter);
+
 
 // 404 + errors
 app.use(notFound);
