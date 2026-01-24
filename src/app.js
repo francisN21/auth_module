@@ -5,11 +5,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
+const pinoHttp = require("pino-http");
 
 const authRouter = require("../routes/auth");
 const { notFound } = require("../middleware/notFound");
 const { errorHandler } = require("../middleware/errorHandler");
 const { pool } = require("./db");
+
 
 const app = express();
 
@@ -31,6 +33,15 @@ app.use(
     credentials: true,
   })
 );
+
+app.use(
+  pinoHttp({
+    redact: ["req.headers.authorization", "req.headers.cookie"],
+  })
+);
+
+const { suspiciousInputLogger } = require("../middleware/suspiciousInputLogger");
+app.use(suspiciousInputLogger);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ ok: true, service: "auth_module" });
