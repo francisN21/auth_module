@@ -34,11 +34,13 @@ app.use(
   })
 );
 
-app.use(
-  pinoHttp({
-    redact: ["req.headers.authorization", "req.headers.cookie"],
-  })
-);
+if (process.env.NODE_ENV !== "test") {
+  app.use(
+    pinoHttp({
+      redact: ["req.headers.authorization", "req.headers.cookie"],
+    })
+  );
+}
 
 const { suspiciousInputLogger } = require("../middleware/suspiciousInputLogger");
 app.use(suspiciousInputLogger);
