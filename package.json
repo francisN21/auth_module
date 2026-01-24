@@ -4,10 +4,12 @@
   "description": "",
   "main": "src/server.js",
   "type": "commonjs",
-  "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
-  },
+"scripts": {
+  "dev": "nodemon src/server.js",
+  "start": "node src/server.js",
+  "test": "cross-env NODE_ENV=test jest --runInBand",
+  "test:watch": "cross-env NODE_ENV=test jest --watch"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
