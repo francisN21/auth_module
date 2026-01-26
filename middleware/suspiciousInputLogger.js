@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const { appendSuspiciousEvent } = require("../src/security/suspiciousFileLogger");
+
 
 const MAX_EXCERPT = 120;
 
@@ -96,6 +98,14 @@ function suspiciousInputLogger(req, res, next) {
     }
 
     if (hits.length) {
+      appendSuspiciousEvent({
+        event: "security.suspicious_input",
+        path: req.originalUrl,
+        method: req.method,
+        ip: req.ip,
+        userAgent: req.get("user-agent"),
+        hits,
+      });
       const logObj = {
         event: "security.suspicious_input",
         path: req.originalUrl,
@@ -104,6 +114,7 @@ function suspiciousInputLogger(req, res, next) {
         userAgent: req.get("user-agent"),
         hits,
       };
+
 
       (req.log || console).warn(logObj, "Suspicious input detected");
 
