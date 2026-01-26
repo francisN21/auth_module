@@ -3,7 +3,7 @@ const path = require("path");
 const request = require("supertest");
 const { app } = require("../src/app");
 const { pool } = require("../src/db");
-const { getSuspiciousLogPath } = require("../src/security/suspiciousFileLogger");
+const { getSuspiciousLogPath } = require("../middleware/suspiciousFileLogger");
 
 function readFileSafe(p) {
   try {

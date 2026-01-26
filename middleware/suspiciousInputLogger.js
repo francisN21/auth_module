@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { appendSuspiciousEvent } = require("../src/security/suspiciousFileLogger");
+const { appendSuspiciousEvent } = require("../middleware/suspiciousFileLogger");
 
 
 const MAX_EXCERPT = 120;
