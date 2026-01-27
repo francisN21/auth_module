@@ -52,6 +52,8 @@ class IpThrottleStore {
     this._dirty = false;
     this._flushTimer = null;
     this._flushEveryMs = 2000;
+    this._noTimers = process.env.NODE_ENV === "test";
+
   }
 
   _lazyLoad() {
@@ -64,16 +66,26 @@ class IpThrottleStore {
     this.prune();
   }
 
-  _scheduleFlush() {
-    if (this._flushTimer) return;
-    this._flushTimer = setTimeout(() => {
-      this._flushTimer = null;
-      if (!this._dirty) return;
-      this._dirty = false;
-      const obj = Object.fromEntries(this.map.entries());
-      writeJsonAtomic(this.filePath, obj);
-    }, this._flushEveryMs);
+_scheduleFlush() {
+  if (this._noTimers) {
+    // Flush immediately (no timers) so Jest can exit cleanly
+    if (!this._dirty) return;
+    this._dirty = false;
+    const obj = Object.fromEntries(this.map.entries());
+    writeJsonAtomic(this.filePath, obj);
+    return;
   }
+
+  if (this._flushTimer) return;
+  this._flushTimer = setTimeout(() => {
+    this._flushTimer = null;
+    if (!this._dirty) return;
+    this._dirty = false;
+    const obj = Object.fromEntries(this.map.entries());
+    writeJsonAtomic(this.filePath, obj);
+  }, this._flushEveryMs);
+}
+
 
   prune() {
     const t = now();
