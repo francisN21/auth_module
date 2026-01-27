@@ -105,6 +105,30 @@ function suspiciousInputLogger(req, res, next) {
     }
 
     if (hits.length) {
+      const ip = req.ip || "unknown";
+      const throttle = ipThrottle.hit(ip);
+
+    if (!throttle.allowed) {
+    // Optional: log ONE line when throttling starts (not every time)
+    // Only emit on first rate-limit moment
+    if (throttle.reason === "rate_limited") {
+      (req.log || console).warn(
+        {
+          event: "security.suspicious_input.throttled",
+          ip,
+          path: req.originalUrl,
+          method: req.method,
+          blockedUntil: throttle.state.blockedUntil,
+          windowStart: throttle.state.windowStart,
+          count: throttle.state.count,
+          totalCount: throttle.state.totalCount,
+        },
+          "Suspicious input logging throttled for IP"
+        );
+      }
+        return next(); // skip logging suspicious payload to avoid flood
+    }
+      
       appendSuspiciousEvent({
         event: "security.suspicious_input",
         path: req.originalUrl,
@@ -137,4 +161,4 @@ function suspiciousInputLogger(req, res, next) {
   next();
 }
 
-module.exports = { suspiciousInputLogger, ipThrottle };
+module.exports = { suspiciousInputLogger };
