@@ -1,6 +1,13 @@
 const crypto = require("crypto");
 const { appendSuspiciousEvent } = require("../middleware/suspiciousFileLogger");
+const { IpThrottleStore } = require("../src/security/ipThrottleStore");
 
+
+const ipThrottle = new IpThrottleStore({
+  windowMs: 60_000,
+  limit: 5,
+  blockMs: 5 * 60_000,
+});
 
 const MAX_EXCERPT = 120;
 
@@ -130,4 +137,4 @@ function suspiciousInputLogger(req, res, next) {
   next();
 }
 
-module.exports = { suspiciousInputLogger };
+module.exports = { suspiciousInputLogger, ipThrottle };
