@@ -1,11 +1,13 @@
+// src/security/ipThrottleStore.js
 const fs = require("fs");
 const path = require("path");
 
 const DEFAULTS = {
-  windowMs: 60_000,      // 1 minute
-  limit: 5,              // 5 suspicious logs per window
-  blockMs: 5 * 60_000,   // block logging for 5 minutes once exceeded
+  windowMs: 60_000, // 1 minute
+  limit: 5, // 5 suspicious logs per window
+  blockMs: 5 * 60_000, // block logging for 5 minutes once exceeded
   pruneAfterMs: 24 * 60 * 60_000, // keep IPs for 24h in file/memory
+  flushEveryMs: 2000, // batch disk writes every ~2s (non-test only)
 };
 
 function now() {
@@ -13,8 +15,10 @@ function now() {
 }
 
 function getThrottlePath() {
-  return process.env.SUSPICIOUS_IPS_PATH ||
-    path.join(process.cwd(), "log", "suspiciousIps.json");
+  return (
+    process.env.SUSPICIOUS_IPS_PATH ||
+    path.join(process.cwd(), "log", "suspiciousIps.json")
+  );
 }
 
 function ensureDir(filePath) {
@@ -48,12 +52,11 @@ class IpThrottleStore {
     this.map = new Map(); // ip -> state
     this._loaded = false;
 
-    // reduce disk writes: we batch flushes
     this._dirty = false;
     this._flushTimer = null;
-    this._flushEveryMs = 2000;
-    this._noTimers = process.env.NODE_ENV === "test";
 
+    // In tests: never create timers; flush immediately so Jest can exit cleanly
+    this._noTimers = process.env.NODE_ENV === "test";
   }
 
   _lazyLoad() {
@@ -66,28 +69,34 @@ class IpThrottleStore {
     this.prune();
   }
 
-_scheduleFlush() {
-  if (this._noTimers) {
-    // Flush immediately (no timers) so Jest can exit cleanly
+  _flushNow() {
     if (!this._dirty) return;
     this._dirty = false;
     const obj = Object.fromEntries(this.map.entries());
     writeJsonAtomic(this.filePath, obj);
-    return;
   }
 
-  if (this._flushTimer) return;
-  this._flushTimer = setTimeout(() => {
-    this._flushTimer = null;
-    if (!this._dirty) return;
-    this._dirty = false;
-    const obj = Object.fromEntries(this.map.entries());
-    writeJsonAtomic(this.filePath, obj);
-  }, this._flushEveryMs);
-}
+  _scheduleFlush() {
+    if (this._noTimers) {
+      // Flush immediately (no timers) so Jest can exit cleanly
+      this._flushNow();
+      return;
+    }
 
+    if (this._flushTimer) return;
+
+    this._flushTimer = setTimeout(() => {
+      this._flushTimer = null;
+      this._flushNow();
+    }, this.cfg.flushEveryMs);
+
+    // Don't keep the process alive just for this timer (nice for CLIs/dev)
+    if (typeof this._flushTimer.unref === "function") this._flushTimer.unref();
+  }
 
   prune() {
+    this._lazyLoad(); // safe if already loaded
+
     const t = now();
     const cutoff = t - this.cfg.pruneAfterMs;
 
@@ -95,6 +104,7 @@ _scheduleFlush() {
       const lastSeen = s.lastSeen || s.windowStart || 0;
       if (lastSeen < cutoff) this.map.delete(ip);
     }
+
     this._dirty = true;
     this._scheduleFlush();
   }
@@ -151,6 +161,18 @@ _scheduleFlush() {
     this._dirty = true;
     this._scheduleFlush();
     return { allowed: true, state: s, reason: "ok" };
+  }
+
+  /**
+   * Call on process shutdown if you want a clean flush + no pending timers.
+   * Not strictly required, but good hygiene.
+   */
+  shutdown() {
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+    this._flushNow();
   }
 }
 
