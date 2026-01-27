@@ -55,17 +55,25 @@ test("throttles suspicious payload logging after 5 events per minute per IP and 
   expect(payloadLogs.length).toBe(5);
 
   spy.mockRestore();
+  // Give the throttle store time to flush JSON to disk (it batches writes)
+  await new Promise((r) => setTimeout(r, 2200));
 
   // Verify JSON file contains the IP with count > 5 and blockedUntil set
   const data = readJsonSafe(process.env.SUSPICIOUS_IPS_PATH);
   expect(data).toBeTruthy();
-  expect(data[ip]).toBeTruthy();
+  //   expect(data[ip]).toBeTruthy();
 
-  const s = data[ip];
+  // Key might be stored as "203.0.113.9" or "::ffff:203.0.113.9"
+  const key = Object.keys(data).find((k) => k === ip || k.endsWith(ip));
+  expect(key).toBeTruthy();
+
+  const s = data[key];
   expect(typeof s.count).toBe("number");
   expect(s.count).toBeGreaterThan(5);
+
   expect(typeof s.blockedUntil).toBe("number");
   expect(s.blockedUntil).toBeGreaterThan(Date.now());
+
   expect(typeof s.totalCount).toBe("number");
   expect(s.totalCount).toBeGreaterThanOrEqual(10);
 });
