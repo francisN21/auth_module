@@ -104,12 +104,13 @@ auth_module/
 
 ```bash
 npm install
-
+```
 ---
 
 ### 2. Environment variables
 
 Create .env in the project root:
+```
 NODE_ENV=development
 PORT=4000
 FRONTEND_ORIGIN=http://localhost:3000
@@ -123,11 +124,11 @@ PGTESTDATABASE=auth_module_test
 
 SUSPICIOUS_LOG_PATH=log/suspiciousInput.txt
 SUSPICIOUS_IPS_PATH=log/suspiciousIps.json
-
+```
 ---
 
 ### 3. PostgreSQL setup
-
+```psql
 CREATE DATABASE auth_module;
 CREATE DATABASE auth_module_test;
 
@@ -138,15 +139,18 @@ GRANT ALL PRIVILEGES ON DATABASE auth_module_test TO auth_user;
 Apply schema to both databases:
 psql -h localhost -U auth_user -d auth_module -f sql/schema.sql
 psql -h localhost -U auth_user -d auth_module_test -f sql/schema.sql
-
+```
 ---
 
 ## Running the Service
 Development (auto-reload)
+```bash
 npm run dev
+```
 Production-style run
+```bash
 npm start
-
+```
 Health checks
 
 - GET /health
@@ -160,15 +164,16 @@ Auth API Endpoints
 Signup
 
 POST /auth/signup
-
-- { "email": "user@example.com", "password": "StrongPassword123!" }
+```json
+{ "email": "user@example.com", "password": "StrongPassword123!" }
+```
 ---
 Login
 
 POST /auth/login
-
-- { "email": "user@example.com", "password": "StrongPassword123!" }
-
+```json
+{ "email": "user@example.com", "password": "StrongPassword123!" }
+```
 ---
 Current User
 
@@ -263,7 +268,7 @@ This repo is intentionally structured to be reused as-is.
 ### Production Checklist
 
 Before deploying:
-
+```env
 - NODE_ENV=production
 - secure cookie flags
 - HTTPS enforced
@@ -271,7 +276,7 @@ Before deploying:
 - log rotation strategy
 - external rate limiting (Redis) if multi-instance
 - CSRF protection strategy for cookies
-
+```
 ---
 
 ### Roadmap
