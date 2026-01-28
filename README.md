@@ -142,7 +142,7 @@ psql -h localhost -U auth_user -d auth_module_test -f sql/schema.sql
 ```
 ---
 
-## Running the Service
+### 4. Running the Service
 Development (auto-reload)
 ```bash
 npm run dev
@@ -245,14 +245,14 @@ Coverage includes:
 - secret-safe logging
 - IP throttling behavior
 
-### Using This Repo as a Template
+## Using This Repo as a Template
 
-## Option 1: GitHub Template (recommended)
+### Option 1: GitHub Template (recommended)
 
 - Mark repo as Template Repository
 - Create new services with one click
 
-## Option 2: Manual reuse
+### Option 2: Manual reuse
 
 - Copy repo folder
 - Rename service references
@@ -268,7 +268,7 @@ This repo is intentionally structured to be reused as-is.
 ### Production Checklist
 
 Before deploying:
-```env
+
 - NODE_ENV=production
 - secure cookie flags
 - HTTPS enforced
@@ -276,12 +276,12 @@ Before deploying:
 - log rotation strategy
 - external rate limiting (Redis) if multi-instance
 - CSRF protection strategy for cookies
-```
+
 ---
 
 ### Roadmap
 
-- Next.js frontend integration
+- Frontend integration
 - Google OAuth (OIDC)
 - Email verification + password reset
 - CSRF hardening
