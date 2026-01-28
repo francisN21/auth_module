@@ -61,7 +61,7 @@ This repository prioritizes:
 ---
 
 ## Project Structure
-
+```tree
 auth_module/
 ├─ src/
 │ ├─ app.js # Express app (no listen)
@@ -92,7 +92,7 @@ auth_module/
 ├─ .gitignore
 ├─ package.json
 └─ README.md
-
+```
 > Runtime logs are written to `log/` but ignored by Git.  
 > Only test files inside `log/` are committed.
 
