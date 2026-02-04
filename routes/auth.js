@@ -1,5 +1,6 @@
 // routes/auth.js
 const express = require("express");
+const crypto = require("crypto");
 const argon2 = require("argon2");
 const { z } = require("zod");
 
@@ -13,6 +14,20 @@ const { requireAuth } = require("../middleware/requireAuth");
 
 const router = express.Router();
 
+function addHours(date, hours) {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function setSessionCookie(res, sid, expiresAt) {
+  res.cookie("sid", sid, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: false, // set true in prod with HTTPS
+    expires: expiresAt,
+    path: "/",
+  });
+}
+
 const signupSchema = z.object({
   email: z.string().email().transform((s) => s.trim()),
   password: z.string().min(8).max(128),
@@ -25,38 +40,54 @@ const loginSchema = z.object({
 
 router.post("/signup", async (req, res, next) => {
   try {
-    const { email, password } = signupSchema.parse(req.body);
+    const { fullName, email, phone, password, accountType, address } = req.body;
 
-    const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ ok: false, message: "Missing required fields" });
+    }
 
-    const userRes = await pool.query(
-      `INSERT INTO users (email, password_hash)
-       VALUES ($1, $2)
-       RETURNING id, email, email_verified_at, created_at`,
-      [email, passwordHash]
+    const existing = await pool.query(`SELECT id FROM users WHERE email = $1`, [email.toLowerCase()]);
+    if (existing.rowCount > 0) {
+      return res.status(409).json({ ok: false, message: "Email already in use" });
+    }
+
+    const passwordHash = await argon2.hash(password);
+
+    const created = await pool.query(
+      `
+      INSERT INTO users (email, password_hash, full_name, phone, account_type, address)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, email, full_name, email_verified_at, created_at
+      `,
+      [
+        email.toLowerCase(),
+        passwordHash,
+        fullName,
+        phone || null,
+        accountType || null,
+        address || null,
+      ]
     );
 
-    const user = userRes.rows[0];
+    const user = created.rows[0];
 
+    // Create session row
     const { sessionId, expiresAt } = await createSession(user.id);
 
+    // Set cookie (use same cookieName everywhere)
     const cookieName = process.env.SESSION_COOKIE_NAME || "sid";
     res.cookie(cookieName, sessionId, {
       ...getCookieOptions(),
       expires: new Date(expiresAt),
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       ok: true,
-      user: { id: user.id, email: user.email, emailVerifiedAt: user.email_verified_at },
+      user,
       session: { expiresAt },
     });
-  } catch (err) {
-    // Handle duplicate email nicely
-    if (err && err.code === "23505") {
-      return res.status(409).json({ ok: false, message: "Email already in use" });
-    }
-    next(err);
+  } catch (e) {
+    next(e);
   }
 });
 
@@ -102,9 +133,9 @@ router.post("/login", async (req, res, next) => {
 router.post("/logout", async (req, res, next) => {
   try {
     const cookieName = process.env.SESSION_COOKIE_NAME || "sid";
-    const sid = req.cookies?.[cookieName];
+    const sessionId = req.cookies?.[cookieName];
 
-    if (sid) await deleteSession(sid);
+    if (sessionId) await deleteSession(sessionId);
 
     res.clearCookie(cookieName, { ...getCookieOptions() });
     res.status(200).json({ ok: true });
@@ -114,23 +145,67 @@ router.post("/logout", async (req, res, next) => {
 });
 
 // Test endpoint: confirms auth + triggers sliding expiration
-router.get("/me", requireAuth, async (req, res, next) => {
+router.get("/me", async (req, res, next) => {
   try {
-    const r = await pool.query(
-      `SELECT id, email, email_verified_at, created_at
-       FROM users
+    const cookieName = process.env.SESSION_COOKIE_NAME || "sid";
+    const sessionId = req.cookies?.[cookieName];
+
+    if (!sessionId) {
+      return res.status(401).json({ ok: false, message: "Not authenticated" });
+    }
+
+    const s = await pool.query(
+      `SELECT id, user_id, expires_at, last_seen_at
+       FROM sessions
        WHERE id = $1`,
-      [req.auth.userId]
+      [sessionId]
     );
 
-    const user = r.rows[0];
-    res.json({
-      ok: true,
-      user,
-      session: { expiresAt: req.auth.expiresAt },
+    if (s.rowCount === 0) {
+      return res.status(401).json({ ok: false, message: "Not authenticated" });
+    }
+
+    const session = s.rows[0];
+    const now = new Date();
+
+    if (new Date(session.expires_at) <= now) {
+      return res.status(401).json({ ok: false, message: "Not authenticated" });
+    }
+
+    const u = await pool.query(
+      `SELECT id, email, full_name, phone, account_type, address, email_verified_at, created_at
+       FROM users
+       WHERE id = $1`,
+      [session.user_id]
+    );
+
+    if (u.rowCount === 0) {
+      return res.status(401).json({ ok: false, message: "Not authenticated" });
+    }
+
+    // Sliding expiration: extend 24h from now
+    const newExpiresAt = addHours(now, 24);
+
+    await pool.query(
+      `UPDATE sessions
+       SET expires_at = $1, last_seen_at = now()
+       WHERE id = $2`,
+      [newExpiresAt, sessionId]
+    );
+
+    // Refresh cookie expiry too
+    res.cookie(cookieName, sessionId, {
+      ...getCookieOptions(),
+      expires: newExpiresAt,
     });
-  } catch (err) {
-    next(err);
+
+    return res.json({
+      ok: true,
+      user: u.rows[0],
+      session: { expiresAt: newExpiresAt.toISOString() },
+    });
+  } catch (e) {
+    next(e);
   }
 });
 

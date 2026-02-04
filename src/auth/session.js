@@ -55,13 +55,26 @@ async function touchSession(sessionId) {
   const r = await pool.query(
     `UPDATE sessions
        SET last_seen_at = now(),
-           expires_at = now() + ($2 || ' hours')::interval
+           expires_at = now() + ($2::int * interval '1 hour')
      WHERE id = $1
-     RETURNING id, user_id, expires_at`,
-    [sessionId, String(ttlHours)]
+     RETURNING id, user_id, expires_at, last_seen_at`,
+    [sessionId, ttlHours]
   );
 
   return r.rows[0] || null;
+}
+
+async function getSession(sessionId) {
+  const r = await pool.query(
+    `SELECT id, user_id, expires_at, last_seen_at
+     FROM sessions
+     WHERE id = $1`,
+    [sessionId]
+  );
+  const s = r.rows[0] || null;
+  if (!s) return null;
+  if (new Date(s.expires_at) <= new Date()) return null;
+  return s;
 }
 
 module.exports = {
